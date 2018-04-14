@@ -1,0 +1,330 @@
+---
+title: "Storm Data Analysis"
+author: "Arif Attar"
+date: "April 8, 2018"
+output: html_document
+---
+
+# The Most Damaging Storm and Weather Event Types in the United States of America between 1950 and 2011
+
+## Synopsis
+This report explores the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.The aim was primarily to determine which storm and weather event types were the most harmful in terms of health of the population and had the greatest economic consequences. The analysis of the data reveals that tornadoes the most harmful in terms of health of the population. Floods have the greatest economic consequences in terms of damage to property and droughts have the greatest economic consequences in terms of damage to crops.
+
+
+## Data Processing
+
+The data for this report was downloaded from https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2. 
+
+
+### Reading in the data
+
+As this file is compressed via the bz2 algorithm, it was unzipped and stored as a CSV file. 
+
+```{r cache = TRUE}
+StormData <- read.csv("repdata%2Fdata%2FStormData.csv")
+```
+
+### Exploration of the dataset
+
+After reading the data, an initial exploration of the dataset was done. 
+
+The dataset has 902297 rows and 37 columns
+
+```{r}
+dim(StormData)
+```
+
+The names of the variables stored in the columns are as follows:
+
+```{r}
+names(StormData)
+```
+
+The top of the dataset with select columns looks like this:
+
+```{r}
+head(StormData[,c(1,2,3,4,5,6,7,8,23,24,25,26,27,28)])
+```
+
+and the bottom of the dataset with select columns looks like this:
+
+```{r}
+tail(StormData[,c(1,2,3,4,5,6,7,8,23,24,25,26,27,28)])
+```
+
+
+For the purpose of our current analysis the most important variable is "EVTYPE" which shows the type of weather event associated with the particular observation. This variable is explored next.
+
+```{r}
+str(StormData$EVTYPE)
+```
+
+"EVTYPE" is a FACTOR variable containing 985 different weather event types.
+
+The 20-most frequently occurring weather event types in the United States of America between 1950 and 2011 are:
+
+```{r}
+TopEVTYPE <- head(summary(StormData$EVTYPE),20)
+TopEVTYPE
+```
+
+
+As can be seen above, some of the event types which are the same have been classified into different event types because of different terminologies used. For example, TSTM Wind, Thunderstorm Wind and Thunderstorm Winds represent the same event type, namely, Thunderstorm Wind and as such should be collapsed into a single event type. 
+So the next step was to collapse these different event types into a single event type.
+
+This was done for event types Thunderstorm Wind and Marine Thunderstorm Wind, and  also Hurricane and Flash Flood.
+From the Storm Data documentation https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf, it is stated on page 32 that River Flood should be classified as Flash Flood.
+
+```{r}
+levels(StormData$EVTYPE)[levels(StormData$EVTYPE)=="TSTM WIND"| levels(StormData$EVTYPE)== "THUNDERSTORM WINDS"] <- "THUNDERSTORM WIND"
+levels(StormData$EVTYPE)[levels(StormData$EVTYPE)=="MARINE TSTM WIND"] <- "MARINE THUNDERSTORM WIND"
+levels(StormData$EVTYPE)[levels(StormData$EVTYPE)=="HURRICANE/TYPHOON"] <- "HURRICANE"
+levels(StormData$EVTYPE)[levels(StormData$EVTYPE)=="RIVER FLOOD"] <- "FLASH FLOOD"
+str(StormData$EVTYPE)
+```
+
+After this transformation, the number of levels of EVTYPE variabe has now collapsed to 980. 
+
+This changes the 20-most frequently occurring weather event types in the United States of America between 1950 and 2011 as follows:
+
+```{r}
+TopEVTYPE <- head(summary(StormData$EVTYPE),20)
+TopEVTYPE
+```
+
+Thunderstorm Wind is the most frequently occuring weather event type in the USA according to the dataset followed by Hail and then Tornado.
+
+A barplot reveals that Thunderstorm Wind and Hail make up a substantial proportion of all the weather event types.
+
+```{r barplot1}
+barplot(head(TopEVTYPE,10), col = "RED")
+```
+
+## Results
+
+This analysis is focused on answering two questions:
+1.  Which weather event types are most harmful to population health?
+2.  Which weather event types have the greatest economic consequences?
+
+
+### 1.  Which weather event types are most harmful to population health?
+
+To answer this question, the variables of interest are EVTYPE, FATALITIES and INJURIES. FATALITIES report the number of fatalities that occured as a result of that particular weather event and INJURIES report the number of injuries that occured as a result of that particular weather event.
+
+A new data set is created which sums the number of FATALITIES grouped by EVTYPE and number of INJURIES grouped by EVTYPE
+
+```{r}
+library(dplyr)
+HealthStormData <- StormData %>% group_by(EVTYPE) %>% summarise_at(vars(FATALITIES, INJURIES), sum)
+str(HealthStormData)
+```
+
+The new data set has three columns with FATALITIES containing the sum of all fatalities associated with the corresponding EVTYPE and INJURIES containing the sum of all injuries associated with the corresponding EVTYPE.
+
+The dataset sorted by descending numbers of fatalities
+
+```{r}
+HealthStormDatabyF <- HealthStormData[order(-HealthStormData$FATALITIES),]
+a <- head(HealthStormDatabyF[,c(1,2)], 10)
+a
+```
+
+It can be concluded from the above list that in terms of number of fatalities, TORNADO is the weather event type most harmful to population health, followed by events classified as EXCESSIVE HEAT, FLASH FLOOD, HEAT, LIGHTNING etc.
+
+The dataset sorted by descending numbers of injuries
+
+```{r}
+HealthStormDatabyI <- HealthStormData[order(-HealthStormData$INJURIES),]
+b <- head(HealthStormDatabyI[,c(1,3)], 10)
+b
+```
+
+It can be concluded from the above list that in terms of number of injuries, TORNADO is the weather event type most harmful to population health, followed by events classified as THUNDERSTORM WIND, FLOOD, EXCESSIVE HEAT, LIGHTNING etc.
+
+
+Plotting the results as a barplot
+
+```{r barplot2}
+library(ggplot2)
+library(gridExtra)
+plot1 <- ggplot(data = head(a,10)) + geom_col(aes(x= EVTYPE, y = FATALITIES), fill = "blue") + ggtitle("MOST HARMFUL WEATHER EVENT TYPES BY NUMBER OF\n FATALITIES") + xlab("Weather Event Type") + ylab("Number of Fatalities") + coord_flip()
+plot2 <- ggplot(data = head(b,10)) + geom_col(aes(x = EVTYPE, y = INJURIES), fill = "red") + ggtitle("MOST HARMFUL WEATHER EVENT TYPES BY NUMBER OF \n INJURIES") + xlab("Weather Event Type") + ylab("Number of Injuries") + coord_flip()
+grid.arrange(plot1, plot2, nrow = 2)
+```
+
+
+
+### 2.  Which weather event types have the greatest economic consequences?
+
+To answer this question the variables of interest are "EVTYPE","PROPDMG", "PROPDMGEXP", "CROPDMG" and "CROPDMGEXP"
+
+Economic consequences can be in terms of damage to property (""PROPDMG", "PROPDMGEXP"") and damage to crops ("CROPDMG" and "CROPDMGEXP")
+
+The analysis first tackles damage to property
+
+PROPDMG contains the dollar value of the damage to property from particular weather event and PROPDMGEXP contains the letters denoting whether the figures in PROPDMG are in Thousands(K) or Millions(M) or Billions(B)
+
+
+
+First, a subset of the StormData dataset is created to include only those observations where the value for PROPDMG > 0. The weather events which did not have any property damage cost are not useful for this part of the analysis.
+
+```{r}
+PropStormData <- subset(StormData, PROPDMG != 0)
+nrow(PropStormData)
+```
+
+The PropStormData dataset has 239174 observations
+
+
+```{r}
+str(PropStormData$PROPDMGEXP)
+summary(PropStormData$PROPDMGEXP)
+```
+
+
+From the above it can be observed that PROPDMGEXP is a factor variable and it has other levels apart from K, M and B. This analysis ignores the other levels and only considers, H, h, K, M, m and B
+
+For the purpose of this analysis the figures in PROPDMG have to be modified such that they include the whole figure for the property damage. Hence the figure in PROPDMG has to be multiplied by 1000 if the corresponding letter in PROPDMGEXP is K, multiplied by 1000000 if it is M and 1000000000 if it is B.
+
+
+```{r cache = TRUE}
+for (i in 1:nrow(PropStormData)) {
+    if (PropStormData$PROPDMGEXP[i] == "K") {
+             PropStormData$PROPDMG[i] = PropStormData$PROPDMG[i] * 1000
+             } else
+             if ((PropStormData$PROPDMGEXP[i] == "M")| (PropStormData$PROPDMGEXP[i] == "m")) {
+                 PropStormData$PROPDMG[i] = PropStormData$PROPDMG[i] * 1000000
+                 } else
+                   if (PropStormData$PROPDMGEXP[i] == "B") {
+                      PropStormData$PROPDMG[i] = PropStormData$PROPDMG[i] * 1000000000
+                      } else 
+                        if ((PropStormData$PROPDMGEXP[i] == "H")| (PropStormData$PROPDMGEXP[i] == "h")) {
+                                   PropStormData$PROPDMG[i] = PropStormData$PROPDMG[i] * 100
+                                   } else  
+                                          {
+                                           PropStormData$PROPDMG[i] = PropStormData$PROPDMG[i] * 1
+                                         }
+          
+}
+```
+Viewing the top rows of PropStormData with selected columns
+
+```{r}
+head(PropStormData[,c(1,2,3,4,5,6,7,8,23,24,25,26,27,28)])
+```
+Comparing the PROPDMG variable in the PropStormData dataset with the PROPDMG variable in the StormData dataset, it can be seen that the values are now incorporating the Ks and Ms in the PROPDMGEXP variable.
+
+A new dataset is created which sums the damage to property in dollar terms (PROPDMG) grouped by weather event type (EVTYPE)
+
+```{r}
+library(dplyr)
+PropStormDatabyEType <- PropStormData %>% group_by(EVTYPE) %>% summarise_at(vars(PROPDMG), sum)
+str(PropStormDatabyEType)
+```
+
+The new data set has three columns with PROPDMG containing the sum of all damage to property in dollar terms associated with the corresponding EVTYPE
+
+The dataset sorted by descending sum of damage to property
+
+```{r}
+PropStormDatabyEType <- PropStormDatabyEType[order(-PropStormDatabyEType$PROPDMG),]
+c <- head(PropStormDatabyEType, 10)
+c
+```
+It can be concluded from the above list that in terms of damage to property weather event type "FLOOD" has the greatest economic consequences, followed by "HURRICANE", "TORNADO", "STORM SURGE", "FLASH FLOOD", etc.
+
+
+The analysis now tackles damage to crops.
+
+
+A similar process as above is now done with the variables CROPDMG and CROPDMGEXP
+
+CROPDMG contains the dollar value of the damage to crops from particular weather event and CROPDMGEXP contains the letters denoting whether the figures in CROPDMG are in Thousands(K) or Millions(M) or Billions(B)
+
+
+
+First, a subset of the StormData dataset is created to include only those observations where the value for CROPDMG > 0. The weather events which did not have any crop damage cost are not useful for this part of the analysis.
+
+
+```{r}
+CropStormData <- subset(StormData, CROPDMG != 0)
+nrow(CropStormData)
+```
+
+The CropStormData dataset has 22099 observations
+
+
+```{r}
+str(CropStormData$CROPDMGEXP)
+summary(CropStormData$CROPDMGEXP)
+```
+
+
+From the above it can be observed that CROPDMGEXP is a factor variable and it has other levels apart from K, M and B. This analysis ignores the other levels and only considers, K, k, M, m and B
+
+For the purpose of this analysis the figures in CROPDMG have to be modified such that they include the whole figure for the crop damage. Hence the figure in CROPDMG has to be multiplied by 1000 if the corresponding letter in CROPDMGEXP is K, multiplied by 1000000 if it is M and 1000000000 if it is B.
+
+
+```{r cache = TRUE}
+for (i in 1:nrow(CropStormData)) {
+    if ((CropStormData$CROPDMGEXP[i] == "K")| (CropStormData$CROPDMGEXP[i] == "k")) {
+             CropStormData$CROPDMG[i] = CropStormData$CROPDMG[i] * 1000
+             } else
+             if ((CropStormData$CROPDMGEXP[i] == "M")| (CropStormData$CROPDMGEXP[i] == "m")) {
+                 CropStormData$CROPDMG[i] = CropStormData$CROPDMG[i] * 1000000
+                 } else
+                   if (CropStormData$CROPDMGEXP[i] == "B") {
+                       CropStormData$CROPDMG[i] = CropStormData$CROPDMG[i] * 1000000000
+                      } else 
+                        {
+                         CropStormData$CROPDMG[i] = CropStormData$CROPDMG[i] * 1
+                         }
+          
+}
+```
+
+
+Viewing the top rows of CropStormData with selected columns
+
+```{r}
+head(CropStormData[,c(1,2,3,4,5,6,7,8,23,24,25,26,27,28)])
+```
+
+Comparing the CROPDMG variable in the CropStormData dataset with the CROPDMG variable in the StormData dataset, it can be seen that the values are now incorporating the Ks and Ms in the CROPDMGEXP variable.
+
+
+
+A new dataset is created which sums the damage to crops in dollar terms (CROPDMG) grouped by weather event type (EVTYPE)
+
+```{r}
+library(dplyr)
+CropStormDatabyEType <- CropStormData %>% group_by(EVTYPE) %>% summarise_at(vars(CROPDMG), sum)
+str(CropStormDatabyEType)
+```
+
+The new data set has three columns with CROPDMG containing the sum of all damage to crops in dollar terms associated with the corresponding EVTYPE
+
+The dataset sorted by descending sum of damage to crops
+
+```{r}
+CropStormDatabyEType <- CropStormDatabyEType[order(-CropStormDatabyEType$CROPDMG),]
+d <- head(CropStormDatabyEType, 10)
+d
+```
+It can be concluded from the above list that in terms of damage to crops, weather event type "DROUGHT" has the greatest economic consequences followed by "FLASH FLOOD", "FLOOD", "HURRICANE", "ICE STORM", etc.
+
+
+Plotting the damage to property and damage to crops by weather event type
+
+```{r barplot3}
+library(grid)
+plotC <- ggplot(data = head(c,10)) + geom_col(aes(x= EVTYPE, y = PROPDMG), fill = "blue") + ggtitle("MOST ECONOMICALLY CONSEQUENTIAL WEATHER \n EVENT TYPES BY DAMAGE TO PROPERTY") + xlab("Weather Event Type") + ylab("Damage to Property in Dollars") + coord_flip()
+
+plotD <- ggplot(data = head(d,10)) + geom_col(aes(x = EVTYPE, y = CROPDMG), fill = "red") + ggtitle("MOST ECONOMICALLY CONSEQUENTIAL WEATHER \n EVENT TYPES BY DAMAGE TO CROPS") + xlab("Weather Event Type") + ylab("Damage to crops in Dollars") + coord_flip()
+
+grid.arrange(plotC, plotD, nrow = 2)
+```
+
+## Conclusion
+
+This analysis sought to determine which weather event types were the most harmful to population health and which weather event types had the greatest economic consequences. The analysis reveals that tornadoes are the most harmful weather event types in the USA, both in terms of fatalities and injuries. The analysis also reveals that floods have the greatest economic consequences in terms of damage to property and droughts have the greatest economic consequences in terms of damage to crops.
